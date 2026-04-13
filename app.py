@@ -79,7 +79,14 @@ def admin_dashboard():
 
     # Get worker requests
     requests_rows = conn.execute('SELECT * FROM worker_requests ORDER BY timestamp DESC').fetchall()
-    requests = [dict(r) for r in requests_rows]
+    requests = []
+    for row in requests_rows:
+        req = dict(row)
+        # Fetch portfolio images for this request
+        port_rows = conn.execute('SELECT image_path FROM portfolio_images WHERE request_id=?', (req['id'],)).fetchall()
+        req['portfolio'] = [p['image_path'] for p in port_rows]
+        req['profile_image'] = req.get('avatar')
+        requests.append(req)
 
     # Get active workers
     workers_rows = conn.execute("SELECT *, avatar as profile_image FROM workers WHERE status='approved'").fetchall()
@@ -115,11 +122,31 @@ def approve_worker(request_id):
 
     if req:
         # Move to workers table
-        conn.execute(
-            '''INSERT INTO workers (name, avatar, profession, rating, review_count, location, bio, status) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-            (req['name'], req['avatar'], req['profession'], 5.0, 0, req['location'], f"Experienced {req['profession']}", 'approved')
+        cur = conn.cursor()
+        cur.execute(
+            '''INSERT INTO workers 
+               (name, avatar, profession, rating, review_count, location, bio, status, 
+                work_hours, aadhaar, dob, age, phone, user_id, email, skills, hourly_rate) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (req['name'], req['avatar'], req['profession'], 5.0, 0, req['location'], 
+             req.get('bio', f"Experienced {req['profession']}"), 'approved',
+             req.get('work_hours'), req.get('aadhaar'), req.get('dob'), req.get('age'),
+             req.get('phone'), req.get('user_id'), req.get('email'), req.get('skills'),
+             req.get('hourly_rate', 0))
         )
+        worker_id = cur.lastrowid
+
+        # Update portfolio images to link to the new worker_id
+        conn.execute('UPDATE portfolio_images SET worker_id = ? WHERE request_id = ?', (worker_id, request_id))
+
+        # Also handle worker_skills table
+        if req.get('skills'):
+            # Clear existing if any (shouldn't be any for a new worker)
+            conn.execute('DELETE FROM worker_skills WHERE worker_id = ?', (worker_id,))
+            for skill in req['skills'].split(','):
+                if skill.strip():
+                    conn.execute('INSERT INTO worker_skills (worker_id, skill) VALUES (?, ?)', (worker_id, skill.strip()))
+
         # Delete from requests
         conn.execute('DELETE FROM worker_requests WHERE id=?', (request_id,))
         conn.commit()
@@ -356,32 +383,63 @@ def signup():
 @login_required
 def join():
     if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        dob = request.form.get('dob')
+        age = request.form.get('age')
         profession = request.form.get('profession')
-        bio = request.form.get('bio')
-        location = request.form.get('location')
+        experience = request.form.get('experience')
         work_hours = request.form.get('work_hours')
-        skills = request.form.get('skills', '').split(',')
+        location = request.form.get('location')
+        aadhaar = request.form.get('aadhaar')
+        skills = request.form.get('skills', '')
+        bio = request.form.get('bio')
 
-        file = request.files.get('avatar')
-        filename = None
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
+        # Handle Profile Photo (avatar)
+        avatar_file = request.files.get('photo')  # Note: join.html uses 'photo'
+        avatar_filename = None
+        if avatar_file and allowed_file(avatar_file.filename):
+            avatar_filename = secure_filename(avatar_file.filename)
+            avatar_file.save(os.path.join(UPLOAD_FOLDER, avatar_filename))
+
+        # Handle CV
+        cv_file = request.files.get('cv')
+        cv_filename = None
+        if cv_file and allowed_file(cv_file.filename):
+            cv_filename = secure_filename(cv_file.filename)
+            cv_file.save(os.path.join(UPLOAD_FOLDER, cv_filename))
 
         conn = get_db_connection()
         try:
             cur = conn.cursor()
-            # Save to worker_requests instead of workers directly
+            # Save to worker_requests
             cur.execute(
-                '''INSERT INTO worker_requests (name, email, profession, location, avatar, bio) 
-                   VALUES (?, ?, ?, ?, ?, ?)''',
-                (session['user']['name'], session['user']['email'], profession, location, filename, bio)
+                '''INSERT INTO worker_requests 
+                   (name, email, phone, dob, age, profession, experience, work_hours, location, aadhaar, skills, bio, avatar, cv, user_id, status) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (name, email, phone, dob, age, profession, experience, work_hours, location, aadhaar, skills, bio, avatar_filename, cv_filename, session['user']['id'], 'pending')
             )
+            request_id = cur.lastrowid
             
+            # Save Portfolio images
+            portfolio_files = request.files.getlist('portfolio')
+            for p_file in portfolio_files:
+                if p_file and allowed_file(p_file.filename):
+                    p_filename = secure_filename(p_file.filename)
+                    # Unique filename to avoid collisions
+                    p_filename = f"req_{request_id}_{p_filename}"
+                    p_file.save(os.path.join(UPLOAD_FOLDER, p_filename))
+                    cur.execute(
+                        'INSERT INTO portfolio_images (request_id, image_path) VALUES (?, ?)',
+                        (request_id, p_filename)
+                    )
+
             conn.commit()
             flash('Your application has been submitted and is pending admin approval.', 'success')
             return redirect(url_for('profile'))
         except Exception as e:
+            conn.rollback()
             flash(f'Error submitting application: {str(e)}', 'error')
         finally:
             conn.close()
