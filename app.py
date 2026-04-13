@@ -4,6 +4,7 @@ from datetime import datetime
 from functools import wraps
 import os
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 from bot import get_bot_response   # chatbot import
 
 UPLOAD_FOLDER = 'static/uploads'
@@ -19,9 +20,14 @@ def allowed_file(filename):
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_demo_purposes'
 
+# Fix for redirection issues behind proxies like PythonAnywhere/Vercel
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+DATABASE = os.path.join(basedir, 'database.db')
 
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -172,6 +178,170 @@ def worker_profile(worker_id):
         worker=worker,
         reviews=reviews
     )
+
+
+# ---------------- USER PROFILE & DASHBOARD ----------------
+
+@app.route('/profile')
+@login_required
+def profile():
+    user = session['user']
+    conn = get_db_connection()
+
+    # Check if user is also a worker
+    worker_row = conn.execute(
+        'SELECT *, avatar as profile_image FROM workers WHERE user_id=?',
+        (user['id'],)
+    ).fetchone()
+
+    worker = None
+    bookings = []
+
+    if worker_row:
+        worker = dict(worker_row)
+        # Get skills
+        skills_rows = conn.execute(
+            'SELECT skill FROM worker_skills WHERE worker_id=?',
+            (worker['id'],)
+        ).fetchall()
+        worker['skills'] = [s['skill'] for s in skills_rows]
+
+        # Get bookings for this worker
+        bookings_rows = conn.execute(
+            '''
+            SELECT br.*, u.name as user_name, u.email as user_email, u.phone as user_phone
+            FROM booking_requests br
+            JOIN users u ON br.user_id = u.id
+            WHERE br.worker_id = ?
+            ORDER BY br.timestamp DESC
+            ''', (worker['id'],)
+        ).fetchall()
+        bookings = [dict(b) for b in bookings_rows]
+
+    conn.close()
+    return render_template('profile.html', user=user, worker=worker, bookings=bookings)
+
+
+# ---------------- SIGNUP ----------------
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        if not all([name, email, password]):
+            flash('Missing required fields', 'error')
+            return redirect(url_for('signup'))
+
+        if password != confirm_password:
+            flash('Passwords do not match', 'error')
+            return redirect(url_for('signup'))
+
+        conn = get_db_connection()
+        try:
+            conn.execute(
+                'INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)',
+                (name, email, phone, password)
+            )
+            conn.commit()
+            flash('Account created! Please log in.', 'success')
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            flash('Email already registered', 'error')
+        finally:
+            conn.close()
+
+    return render_template('signup.html')
+
+
+# ---------------- JOIN AS PROFESSIONAL ----------------
+
+@app.route('/join', methods=['GET', 'POST'])
+@login_required
+def join():
+    if request.method == 'POST':
+        profession = request.form.get('profession')
+        bio = request.form.get('bio')
+        location = request.form.get('location')
+        work_hours = request.form.get('work_hours')
+        skills = request.form.get('skills', '').split(',')
+
+        file = request.files.get('avatar')
+        filename = None
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(UPLOAD_FOLDER, filename))
+
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                '''INSERT INTO workers (user_id, name, profession, bio, rating, location, work_hours, avatar, status) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (session['user']['id'], session['user']['name'], profession, bio, 5.0, location, work_hours, filename, 'approved')
+            )
+            worker_id = cur.lastrowid
+            
+            # Insert skills
+            for skill in skills:
+                if skill.strip():
+                    conn.execute('INSERT INTO worker_skills (worker_id, skill) VALUES (?, ?)', (worker_id, skill.strip()))
+            
+            conn.commit()
+            flash('You are now a registered professional!', 'success')
+            return redirect(url_for('profile'))
+        except Exception as e:
+            flash(f'Error joining: {str(e)}', 'error')
+        finally:
+            conn.close()
+
+    return render_template('join.html')
+
+
+# ---------------- BOOKING ACTIONS ----------------
+
+@app.route('/book_pro', methods=['POST'])
+@login_required
+def book_pro():
+    worker_id = request.form.get('worker_id')
+    user_id = session['user']['id']
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            'INSERT INTO booking_requests (worker_id, user_id, status) VALUES (?, ?, ?)',
+            (worker_id, user_id, 'Pending')
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+    finally:
+        conn.close()
+
+@app.route('/accept_booking/<int:booking_id>', methods=['POST'])
+@login_required
+def accept_booking(booking_id):
+    conn = get_db_connection()
+    conn.execute('UPDATE booking_requests SET status = ? WHERE id = ?', ('Accepted', booking_id))
+    conn.commit()
+    conn.close()
+    flash('Booking accepted!', 'success')
+    return redirect(url_for('profile'))
+
+@app.route('/reject_booking/<int:booking_id>', methods=['POST'])
+@login_required
+def reject_booking(booking_id):
+    conn = get_db_connection()
+    conn.execute('UPDATE booking_requests SET status = ? WHERE id = ?', ('Rejected', booking_id))
+    conn.commit()
+    conn.close()
+    flash('Booking rejected.', 'info')
+    return redirect(url_for('profile'))
 
 
 # ---------------- CHATBOT ROUTE ----------------
