@@ -42,7 +42,18 @@ def login_required(f):
     return decorated_function
 
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session or session['user']['email'] != 'admin@example.com':
+            flash('Admin access required.', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # ---------------- HOME ----------------
+
 
 @app.route('/')
 def home():
@@ -57,6 +68,87 @@ def home():
     conn.close()
 
     return render_template('home.html', services=services, workers=workers)
+
+
+# ---------------- ADMIN DASHBOARD ----------------
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    conn = get_db_connection()
+
+    # Get worker requests
+    requests_rows = conn.execute('SELECT * FROM worker_requests ORDER BY timestamp DESC').fetchall()
+    requests = [dict(r) for r in requests_rows]
+
+    # Get active workers
+    workers_rows = conn.execute("SELECT *, avatar as profile_image FROM workers WHERE status='approved'").fetchall()
+    active_workers = []
+    for row in workers_rows:
+        w = dict(row)
+        # Get portfolio for icons in table
+        port = conn.execute('SELECT image_path FROM portfolio_images WHERE worker_id=?', (w['id'],)).fetchone()
+        w['portfolio'] = [port['image_path']] if port else []
+        active_workers.append(w)
+
+    # Stats
+    pending_apps = len(requests)
+    active_pros = len(active_workers)
+    total_bookings = conn.execute('SELECT COUNT(*) FROM booking_requests').fetchone()[0]
+
+    conn.close()
+    return render_template(
+        'admin.html',
+        requests=requests,
+        active_workers=active_workers,
+        pending_apps=pending_apps,
+        active_pros=active_pros,
+        total_bookings=total_bookings
+    )
+
+
+@app.route('/approve_worker/<int:request_id>', methods=['POST'])
+@admin_required
+def approve_worker(request_id):
+    conn = get_db_connection()
+    req = conn.execute('SELECT * FROM worker_requests WHERE id=?', (request_id,)).fetchone()
+
+    if req:
+        # Move to workers table
+        conn.execute(
+            '''INSERT INTO workers (name, avatar, profession, rating, review_count, location, bio, status) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (req['name'], req['avatar'], req['profession'], 5.0, 0, req['location'], f"Experienced {req['profession']}", 'approved')
+        )
+        # Delete from requests
+        conn.execute('DELETE FROM worker_requests WHERE id=?', (request_id,))
+        conn.commit()
+        flash(f"Professional {req['name']} approved!", 'success')
+
+    conn.close()
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/reject_request/<int:request_id>', methods=['POST'])
+@admin_required
+def reject_request(request_id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM worker_requests WHERE id=?', (request_id,))
+    conn.commit()
+    conn.close()
+    flash("Application rejected and removed.", 'info')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/delete_worker/<int:worker_id>', methods=['POST'])
+@admin_required
+def delete_worker(worker_id):
+    conn = get_db_connection()
+    conn.execute("UPDATE workers SET status='deleted' WHERE id=?", (worker_id,))
+    conn.commit()
+    conn.close()
+    flash("Worker profile deactivated.", 'success')
+    return redirect(url_for('admin_dashboard'))
 
 
 # ---------------- SERVICES ----------------
