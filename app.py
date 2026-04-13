@@ -121,6 +121,9 @@ def approve_worker(request_id):
     req = conn.execute('SELECT * FROM worker_requests WHERE id=?', (request_id,)).fetchone()
 
     if req:
+        # Convert row to dict to use .get() safely
+        req = dict(req)
+        
         # Move to workers table
         cur = conn.cursor()
         cur.execute(
