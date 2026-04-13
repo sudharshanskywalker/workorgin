@@ -371,23 +371,18 @@ def join():
         conn = get_db_connection()
         try:
             cur = conn.cursor()
+            # Save to worker_requests instead of workers directly
             cur.execute(
-                '''INSERT INTO workers (user_id, name, profession, bio, rating, location, work_hours, avatar, status) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (session['user']['id'], session['user']['name'], profession, bio, 5.0, location, work_hours, filename, 'approved')
+                '''INSERT INTO worker_requests (name, email, profession, location, avatar, bio) 
+                   VALUES (?, ?, ?, ?, ?, ?)''',
+                (session['user']['name'], session['user']['email'], profession, location, filename, bio)
             )
-            worker_id = cur.lastrowid
-            
-            # Insert skills
-            for skill in skills:
-                if skill.strip():
-                    conn.execute('INSERT INTO worker_skills (worker_id, skill) VALUES (?, ?)', (worker_id, skill.strip()))
             
             conn.commit()
-            flash('You are now a registered professional!', 'success')
+            flash('Your application has been submitted and is pending admin approval.', 'success')
             return redirect(url_for('profile'))
         except Exception as e:
-            flash(f'Error joining: {str(e)}', 'error')
+            flash(f'Error submitting application: {str(e)}', 'error')
         finally:
             conn.close()
 

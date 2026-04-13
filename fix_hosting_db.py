@@ -71,6 +71,13 @@ def fix_db():
         cur.execute("ALTER TABLE users ADD COLUMN phone TEXT")
         print("Added phone to users")
 
+    # Worker requests table
+    cur.execute("PRAGMA table_info(worker_requests)")
+    req_cols = [col[1] for col in cur.fetchall()]
+    if 'bio' not in req_cols:
+        cur.execute("ALTER TABLE worker_requests ADD COLUMN bio TEXT")
+        print("Added bio to worker_requests")
+
     conn.commit()
     conn.close()
     print("Database fix completed successfully!")
