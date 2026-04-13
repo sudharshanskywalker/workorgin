@@ -176,6 +176,31 @@
 
 {% block content %}
 <div class="profile-page-container">
+    <!-- Notifications Section -->
+    {% if notifications %}
+    <div class="profile-card" style="border-left: 4px solid var(--blue-600); margin-bottom: 2rem;">
+        <div class="section-title">
+            <i data-lucide="bell" class="icon-sm"></i> Notifications
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            {% for note in notifications %}
+            <div style="padding: 1rem; background: #f8fafc; border-radius: 0.75rem; display: flex; gap: 0.75rem; align-items: flex-start; border: 1px solid #f1f5f9;">
+                <div style="padding: 0.5rem; background: var(--blue-50); border-radius: 50%;">
+                    <i data-lucide="info" class="icon-sm" style="color: var(--blue-600);"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-size: 0.95rem; color: var(--gray-800); font-weight: 500;">{{ note.message }}</div>
+                    <div style="font-size: 0.75rem; color: var(--gray-400); margin-top: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
+                        <i data-lucide="clock" style="width: 12px; height: 12px;"></i>
+                        {{ note.timestamp }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- User Profile Section -->
     <div class="profile-card">
         <div class="profile-header">

@@ -142,6 +142,13 @@ def approve_worker(request_id):
         # Update portfolio images to link to the new worker_id
         conn.execute('UPDATE portfolio_images SET worker_id = ? WHERE request_id = ?', (worker_id, request_id))
 
+        # Add Notification for the worker
+        if req.get('user_id'):
+            conn.execute(
+                'INSERT INTO notifications (user_id, message) VALUES (?, ?)',
+                (req['user_id'], "Congratulations! Your professional profile application has been approved by the admin.")
+            )
+
         # Also handle worker_skills table
         if req.get('skills'):
             # Clear existing if any (shouldn't be any for a new worker)
@@ -341,7 +348,17 @@ def profile():
         bookings = [dict(b) for b in bookings_rows]
 
     conn.close()
-    return render_template('profile.html', user=user, worker=worker, bookings=bookings)
+
+    # Fetch notifications
+    conn = get_db_connection()
+    notifications_rows = conn.execute(
+        'SELECT * FROM notifications WHERE user_id=? ORDER BY timestamp DESC LIMIT 10',
+        (user['id'],)
+    ).fetchall()
+    notifications = [dict(n) for n in notifications_rows]
+    conn.close()
+
+    return render_template('profile.html', user=user, worker=worker, bookings=bookings, notifications=notifications)
 
 
 # ---------------- SIGNUP ----------------
@@ -464,6 +481,16 @@ def book_pro():
             'INSERT INTO booking_requests (worker_id, user_id, status) VALUES (?, ?, ?)',
             (worker_id, user_id, 'Pending')
         )
+        
+        # Add Notification for the worker
+        user_name = session['user']['name']
+        worker_row = conn.execute('SELECT user_id FROM workers WHERE id=?', (worker_id,)).fetchone()
+        if worker_row and worker_row['user_id']:
+            conn.execute(
+                'INSERT INTO notifications (user_id, message) VALUES (?, ?)',
+                (worker_row['user_id'], f"You have a new booking request from {user_name}!")
+            )
+
         conn.commit()
         return jsonify({"success": True})
     except Exception as e:
