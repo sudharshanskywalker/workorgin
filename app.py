@@ -344,6 +344,42 @@ def reject_booking(booking_id):
     return redirect(url_for('profile'))
 
 
+@app.route('/submit_review/<int:worker_id>', methods=['POST'])
+@login_required
+def submit_review(worker_id):
+    rating = request.form.get('rating')
+    comment = request.form.get('comment')
+    user_id = session['user']['id']
+
+    if not rating or not comment:
+        flash('Please provide both a rating and a comment.', 'error')
+        return redirect(url_for('worker_profile', worker_id=worker_id))
+
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            'INSERT INTO reviews (worker_id, user_id, rating, comment) VALUES (?, ?, ?, ?)',
+            (worker_id, user_id, rating, comment)
+        )
+        
+        # Update worker's rating/count
+        conn.execute('''
+            UPDATE workers 
+            SET rating = (SELECT AVG(rating) FROM reviews WHERE worker_id = ?),
+                review_count = (SELECT COUNT(*) FROM reviews WHERE worker_id = ?)
+            WHERE id = ?
+        ''', (worker_id, worker_id, worker_id))
+        
+        conn.commit()
+        flash('Thank you for your review!', 'success')
+    except Exception as e:
+        flash(f'Error submitting review: {str(e)}', 'error')
+    finally:
+        conn.close()
+
+    return redirect(url_for('worker_profile', worker_id=worker_id))
+
+
 # ---------------- CHATBOT ROUTE ----------------
 
 @app.route('/chat', methods=['POST'])
