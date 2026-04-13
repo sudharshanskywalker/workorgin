@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/workerprofile.css') }}">
+<style>
+    .reviews-header-flex {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .btn-review-toggle {
+        padding: 0.5rem 1.25rem;
+        background: var(--primary-50);
+        color: var(--primary-600);
+        border: 1px solid var(--primary-100);
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-review-toggle:hover {
+        background: var(--primary-100);
+    }
+
+    .review-form-wrapper {
+        background: var(--gray-50);
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+        margin-bottom: 2rem;
+        border: 1px solid var(--gray-200);
+    }
+
+    .star-rating-input {
+        display: flex;
+        flex-direction: row-reverse;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    .star-rating-input input {
+        display: none;
+    }
+
+    .star-rating-input label {
+        cursor: pointer;
+        color: var(--gray-300);
+        transition: color 0.2s;
+    }
+
+    .star-rating-input label:hover,
+    .star-rating-input label:hover~label,
+    .star-rating-input input:checked~label {
+        color: #fbbf24;
+    }
+
+    .form-textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 0.75rem;
+        border: 1px solid var(--gray-300);
+        border-radius: 0.5rem;
+        font-family: inherit;
+        margin-top: 0.5rem;
+        resize: vertical;
+    }
+
+    .btn-submit-review {
+        margin-top: 1rem;
+        padding: 0.75rem 1.5rem;
+        background: var(--primary-600);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .star-filled {
+        color: #fbbf24;
+        fill: #fbbf24;
+    }
+
+    .no-reviews {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--gray-500);
+    }
+
+    .no-reviews-icon {
+        width: 3rem;
+        height: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
+    }
+
+    .hidden {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-grid">
+        <!-- Sidebar -->
+        <div class="profile-sidebar">
+            <div class="profile-card sidebar-sticky">
+                <div class="profile-header">
+                    <div class="avatar-wrapper">
+                        <img src="{{ url_for('static', filename='uploads/' + worker.profile_image) if worker.profile_image and 'http' not in worker.profile_image else worker.profile_image }}"
+                            alt="{{ worker.name }}" class="profile-avatar" />
+                        <div class="status-indicator"></div>
+                    </div>
+                    <h1 class="profile-name">{{ worker.name }}</h1>
+                    <p class="profile-profession">{{ worker.profession }}</p>
+
+                    <div class="profile-location">
+                        <i data-lucide="map-pin" class="icon-sm"></i>
+                        {{ worker.location }}
+                    </div>
+                </div>
+
+                <div class="profile-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">Rating</span>
+                        <div class="rating-badge">
+                            <span class="rating-score">{{ worker.rating }}</span>
+                            <i data-lucide="star" class="star-icon"></i>
+                            <span class="review-count">({{ worker.review_count }})</span>
+                        </div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Work Availability</span>
+                        <span class="stat-value">{{ worker.work_hours if worker.work_hours else 'Flexible' }}</span>
+                    </div>
+                    {% if worker.age %}
+                    <div class="stat-row">
+                        <span class="stat-label">Age</span>
+                        <span class="stat-value">{{ worker.age }} years</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="profile-actions">
+                    <button class="btn-book" data-logged-in="{{ 'true' if session.get('user') else 'false' }}"
+                        data-worker-name="{{ worker.name }}" data-worker-id="{{ worker.id }}"
+                        onclick="handleBooking(this.dataset.loggedIn === 'true', this.dataset.workerName, this.dataset.workerId)">
+                        Book Now
+                    </button>
+                    <button class="btn-message">
+                        <i data-lucide="message-circle" class="icon-sm"></i>
+                        Message
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="profile-main">
+            <!-- About -->
+            <section class="profile-card">
+                <h2 class="section-heading">About Me</h2>
+                <p class="about-text">
+                    {{ worker.bio }}
+                </p>
+            </section>
+
+            <!-- Skills -->
+            <section class="profile-card">
+                <h2 class="section-heading">Skills & Expertise</h2>
+                <div class="skills-list">
+                    {% for skill in worker.skills %}
+                    <span class="skill-badge">
+                        <i data-lucide="check" class="check-icon"></i>
+                        {{ skill }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Portfolio Section -->
+            {% if worker.portfolio %}
+            <section class="profile-card">
+                <h2 class="section-heading">Work Portfolio</h2>
+                <div
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                    {% for img in worker.portfolio %}
+                    <a href="{{ url_for('static', filename='uploads/' + img) }}" target="_blank"
+                        class="portfolio-item-link">
+                        <img src="{{ url_for('static', filename='uploads/' + img) }}" alt="Work sample"
+                            style="width: 100%; height: 120px; object-fit: cover; border-radius: 0.5rem; border: 1px solid var(--gray-200); cursor: pointer; transition: transform 0.2s;">
+                    </a>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            <!-- Verification Badges -->
+            <section class="badges-grid">
+                <div class="verification-badge badge-blue">
+                    <i data-lucide="shield-check" class="badge-icon"></i>
+                    <div>
+                        <h3 class="badge-title">Identity Verified</h3>
+                        <p class="badge-desc">Government ID checked</p>
+                    </div>
+                </div>
+                <div class="verification-badge badge-green">
+                    <i data-lucide="clock" class="badge-icon"></i>
+                    <div>
+                        <h3 class="badge-title">Quick Response</h3>
+                        <p class="badge-desc">Responds within 1hr</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reviews Section -->
+            <section class="profile-card">
+                <div class="reviews-header-flex">
+                    <h2 class="section-heading">Recent Reviews</h2>
+                    {% if session.get('user') %}
+                    <button id="show-review-form" class="btn-review-toggle"
+                        onclick="document.getElementById('review-form-container').classList.toggle('hidden')">
+                        Write a Review
+                    </button>
+                    {% else %}
+                    <a href="{{ url_for('login', next=request.url) }}" class="btn-review-toggle">Login to Review</a>
+                    {% endif %}
+                </div>
+
+                <!-- Review Form -->
+                {% if session.get('user') %}
+                <div id="review-form-container" class="review-form-wrapper hidden">
+                    <form action="{{ url_for('submit_review', worker_id=worker.id) }}" method="POST"
+                        class="review-form">
+                        <div class="rating-input-group">
+                            <label class="form-label">Your Rating</label>
+                            <div class="star-rating-input">
+                                {% for i in range(5, 0, -1) %}
+                                <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}" required />
+                                <label for="star{{ i }}"><i data-lucide="star" class="star-icon"></i></label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 1rem;">
+                            <label class="form-label">Your Comment</label>
+                            <textarea name="comment" class="form-textarea"
+                                placeholder="Share your experience with {{ worker.name }}..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn-submit-review">Submit Review</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <div class="reviews-list">
+                    {% if reviews %}
+                    {% for review in reviews %}
+                    <div class="review-item">
+                        <div class="review-header">
+                            <div class="reviewer-info">
+                                <div class="reviewer-avatar">
+                                    {{ review.user_name[0] | upper }}
+                                </div>
+                                <span class="reviewer-name">{{ review.user_name }}</span>
+                            </div>
+                            <span class="review-date">{{ review.timestamp.split(' ')[0] if review.timestamp else
+                                'Recent' }}</span>
+                        </div>
+                        <div class="review-stars">
+                            {% for j in range(5) %}
+                            <i data-lucide="star"
+                                class="star-icon-sm {% if j < review.rating %}star-filled{% endif %}"></i>
+                            {% endfor %}
+                        </div>
+                        <p class="review-text">
+                            "{{ review.comment }}"
+                        </p>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="no-reviews">
+                        <i data-lucide="message-square" class="no-reviews-icon"></i>
+                        <p>No reviews yet. Be the first to review {{ worker.name }}!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

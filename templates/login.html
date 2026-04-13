@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <h1 class="login-title">Sign In to Worko</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash-alert {{ 'flash-error' if category == 'error' else 'flash-success' }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" class="login-form">
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" name="email" required class="form-input" placeholder="you@example.com" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" required class="form-input" placeholder="••••••••" />
+            </div>
+
+            <div class="form-options">
+                <label class="checkbox-label">
+                    <input type="checkbox" class="checkbox-input">
+                    Remember me
+                </label>
+                <a href="#" class="forgot-link">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="btn-signin-submit">
+                Sign In
+            </button>
+        </form>
+
+        <p class="login-footer">
+            Don't have an account?
+            <a href="/signup" class="signup-link">Sign up</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

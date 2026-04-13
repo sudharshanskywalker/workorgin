@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/service.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="services-container">
+    <div class="services-header">
+        <div class="header-titling">
+            <h1 class="services-title">Find Professionals</h1>
+            <p class="services-subtitle">Filter by service or location to match your needs</p>
+        </div>
+
+        <form action="/services" method="GET" id="filter-form">
+            <div class="search-filter-container">
+                <div class="search-input-wrapper">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" name="q" placeholder="Search services or pros..." class="search-input"
+                        value="{{ search_query }}" />
+                </div>
+                <button type="button" class="btn-filter" onclick="toggleFilters()">
+                    <i data-lucide="filter" class="icon-sm"></i>
+                    <span class="btn-text">Filter</span>
+                </button>
+            </div>
+
+            <!-- Advanced Filters Panel -->
+            <div id="advanced-filters" class="advanced-filters hidden">
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label class="filter-label">Location</label>
+                        <input type="text" name="location" placeholder="e.g. New York" class="filter-input"
+                            value="{{ selected_location }}">
+                    </div>
+
+                    <div class="filter-group">
+                        <label class="filter-label">Work Options</label>
+                        <select name="work_hours" class="filter-input">
+                            <option value="">Any Availability</option>
+                            <option value="Full Time" {{ 'selected' if work_hours=='Full Time' else '' }}>Full Time
+                            </option>
+                            <option value="Part Time" {{ 'selected' if work_hours=='Part Time' else '' }}>Part Time
+                            </option>
+                            <option value="Flexible" {{ 'selected' if work_hours=='Flexible' else '' }}>Flexible
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-actions">
+                    <a href="/services" class="btn-reset">Reset</a>
+                    <button type="submit" class="btn-apply">Apply Filters</button>
+                </div>
+            </div>
+            {% if selected_category %}
+            <input type="hidden" name="category" value="{{ selected_category }}">
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Categories -->
+    <div class="categories-scroll">
+        <div class="categories-list">
+            <a href="/services" class="category-tag {{ 'active' if not selected_category else '' }}">
+                All
+            </a>
+            {% for category in categories %}
+            <a href="/services?category={{ category }}"
+                class="category-tag {{ 'active' if selected_category == category else '' }}">
+                {{ category }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Grid -->
+    {% if workers %}
+    <div class="services-grid">
+        {% for worker in workers %}
+        <div class="worker-card">
+            <div class="worker-header">
+                <div class="worker-info">
+                    <img src="{{ url_for('static', filename='uploads/' + worker.profile_image) if worker.profile_image and 'http' not in worker.profile_image else worker.profile_image }}"
+                        alt="{{ worker.name }}" class="worker-avatar" />
+                    <div>
+                        <h3 class="worker-name">{{ worker.name }}</h3>
+                        <p class="worker-profession">{{ worker.profession }}</p>
+                    </div>
+                </div>
+                <div class="worker-rating">
+                    <i data-lucide="star" class="star-icon"></i>
+                    {{ worker.rating }}
+                </div>
+            </div>
+
+            <p class="worker-bio">
+                {{ worker.bio }}
+            </p>
+
+            <div class="worker-skills">
+                {% for skill in worker.skills[:3] %}
+                <span class="skill-tag">
+                    {{ skill }}
+                </span>
+                {% endfor %}
+                {% if worker.skills|length > 3 %}
+                <span class="skill-tag-more">
+                    +{{ worker.skills|length - 3 }}
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="worker-footer">
+                <div class="worker-rate" style="color: var(--primary-600); font-weight: 500;">
+                    Verified Professional
+                </div>
+                <div class="worker-actions-row">
+                    <a href="/worker/{{ worker.id }}" class="btn-view-profile">
+                        View Profile
+                    </a>
+                    <button class="btn-book-sm" data-logged-in="{{ 'true' if session.get('user') else 'false' }}"
+                        data-worker-name="{{ worker.name }}" data-worker-id="{{ worker.id }}"
+                        onclick="handleBooking(this.dataset.loggedIn === 'true', this.dataset.workerName, this.dataset.workerId)">
+                        Book Now
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-results">
+        <i data-lucide="search-x" class="empty-icon-lg"></i>
+        <h3 class="empty-title">No workers found</h3>
+        <p class="empty-subtitle">Try adjusting your filters or search query.</p>
+        <a href="/services" class="btn-clean-filters">Clear all filters</a>
+    </div>
+    {% endif %}
+
+    <script>
+        function toggleFilters() {
+            const panel = document.getElementById('advanced-filters');
+            panel.classList.toggle('hidden');
+        }
+    </script>
+</div>
+{% endblock %}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Worko - Find Skilled Workers{% endblock %}</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+
+<body>
+    <div id="notifications-container" class="notifications-container"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <a href="/" class="logo">
+                Worko
+            </a>
+
+            <div class="nav-links">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/services" class="nav-link">Find Workers</a>
+                <a href="/join" class="nav-link">Join as Pro</a>
+            </div>
+
+            <div class="nav-actions">
+                {% if request.path == '/' %}
+                {% if session.get('user') %}
+                <a href="/profile"
+                    style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit;">
+                    <i data-lucide="user-circle" class="icon-md"></i>
+                    <span class="user-greeting">Hi, {{ session['user']['name'] }}</span>
+                </a>
+                <a href="/logout" class="btn-logout">Logout</a>
+                {% else %}
+                <a href="/login" class="btn-signin">Sign In</a>
+                <a href="/signup" class="btn-signup">Sign Up</a>
+                {% endif %}
+                {% endif %}
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <button class="mobile-menu-btn" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+                <i data-lucide="menu" class="icon-lg"></i>
+            </button>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="mobile-menu hidden">
+            <div class="mobile-menu-content">
+                <a href="/" class="mobile-nav-link">Home</a>
+                <a href="/services" class="mobile-nav-link">Find Workers</a>
+                <a href="/join" class="mobile-nav-link">Join as Pro</a>
+                <div class="mobile-auth-actions">
+                    {% if request.path == '/' %}
+                    {% if session.get('user') %}
+                    <a href="/profile" class="mobile-nav-link"
+                        style="padding-left: 0; color: var(--blue-600); font-weight: 600;">
+                        <i data-lucide="user-circle" class="icon-sm"></i> My Profile
+                    </a>
+                    <a href="/logout" class="mobile-btn-logout">Logout</a>
+                    {% else %}
+                    <a href="/login" class="mobile-btn-signin">Sign In</a>
+                    <a href="/signup" class="mobile-btn-signup">Sign Up</a>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flashed Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="flash-message {{ 'flash-error' if category == 'error' else 'flash-success' }}" role="alert">
+        <p>{{ message }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <main class="flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Chat Assistant UI -->
+    <div class="chat-container">
+        <div id="chat-window" class="chat-window">
+            <div class="chat-header">
+                <div class="chat-header-info">
+                    <h3>JARVIS 🤖</h3>
+                    <p>System Online | AI Assistant</p>
+                </div>
+                <button id="close-chat"
+                    style="margin-left: auto; background: none; border: none; color: white; cursor: pointer;">
+                    <i data-lucide="x" class="icon-sm"></i>
+                </button>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="message bot">
+                    Hello! I'm JARVIS. 🤖 How can I assist you with Worko today?
+                </div>
+            </div>
+            <form id="chat-form" class="chat-input-area">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Type your message..."
+                    autocomplete="off">
+                <button type="submit" class="chat-submit">
+                    <i data-lucide="send" class="icon-sm"></i>
+                </button>
+            </form>
+        </div>
+        <div id="chat-bubble" class="chat-bubble ripple">
+            <i data-lucide="bot" class="icon-lg"></i>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div style="text-align: center;">
+                <a href="/" class="footer-brand">Worko</a>
+                <p class="footer-desc">
+                    Connecting you with skilled local professionals for all your home and office needs.
+                </p>
+            </div>
+            <div class="footer-copyright">
+                © {{ now.year }} Worko. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Initialize Lucide Icons -->
+    <!-- Removed Tailwind CDN to ensure pure CSS -->
+    <script>
+        lucide.createIcons();
+    </script>
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,392 @@
+{% extends 'base.html' %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/join.css') }}">
+<style>
+    .skills-tag-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        min-height: 40px;
+        padding: 0.5rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        background: #f8fafc;
+    }
+
+    .skill-tag {
+        padding: 0.4rem 0.8rem;
+        border-radius: 2rem;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+        user-select: none;
+    }
+
+    .skill-tag.selected {
+        background: #2563eb;
+        color: white;
+        border-color: #2563eb;
+    }
+
+    .skill-tag:hover:not(.selected) {
+        border-color: #2563eb;
+        color: #2563eb;
+    }
+
+    .portfolio-upload-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .portfolio-upload-item {
+        aspect-ratio: 1;
+        border: 2px dashed #cbd5e1;
+        border-radius: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #f8fafc;
+        position: relative;
+        overflow: hidden;
+        color: #64748b;
+        font-size: 0.8rem;
+        text-align: center;
+        padding: 0.5rem;
+    }
+
+    .portfolio-upload-item:hover {
+        border-color: #2563eb;
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .portfolio-upload-item.has-image {
+        border-style: solid;
+        border-color: #e2e8f0;
+    }
+
+    .portfolio-upload-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .portfolio-upload-item .upload-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .portfolio-upload-item .remove-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        background: rgba(239, 68, 68, 0.9);
+        color: white;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+    }
+
+    .portfolio-upload-item .remove-btn:hover {
+        background: #dc2626;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="join-container">
+    <div class="join-card">
+        <h1 class="join-title">Join as a Professional</h1>
+        <p class="join-subtitle">
+            Start earning by connecting with customers in your area.
+        </p>
+
+        <form method="POST" class="join-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="name" required class="form-input" placeholder="Your name" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" name="email" class="gmail" required pattern="[A-Za-z0-9._%+-]+@gmail\.com"
+                    placeholder="user@gmail.com" />
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" name="phone" required class="form-input" placeholder="e.g. 9876543210"
+                        pattern="[0-9]{10}" maxlength="10" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" name="dob" id="dob-input" required class="form-input"
+                        onchange="calculateAge()" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Age</label>
+                    <input type="number" name="age" id="age-input" required class="form-input" placeholder="Age"
+                        min="18" readonly />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Profession</label>
+                <input type="text" name="profession" id="profession-input" required class="form-input"
+                    placeholder="e.g. Plumber, Electrician..." list="profession-options" />
+                <datalist id="profession-options">
+                    <option value="Plumber">
+                    <option value="Electrician">
+                    <option value="Carpenter">
+                    <option value="Cleaner">
+                    <option value="Painter">
+                    <option value="Gardener">
+                    <option value="Mechanic">
+                    <option value="Software Developer">
+                    <option value="Teacher">
+                    <option value="Doctor">
+                    <option value="Engineer">
+                    <option value="Designer">
+                    <option value="Bystander">
+                </datalist>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Years of Experience</label>
+                    <input type="number" name="experience" required min="0" class="form-input" placeholder="Years" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Work Availability (Hours/Day)</label>
+                <input type="text" name="work_hours" required class="form-input" placeholder="e.g. 9 AM - 5 PM" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Location (City)</label>
+                <input type="text" name="location" required class="form-input" placeholder="e.g. Kerala, India" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Aadhaar No</label>
+                <input type="text" name="aadhaar" class="form-input" placeholder="Enter 12-digit Aadhaar number"
+                    pattern="\d{12}" maxlength="12" minlength="12" inputmode="numeric" required />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Skills & Expertise (Select relevant tags)</label>
+                <div id="skills-container" class="skills-tag-container">
+                    <!-- Tags will be populated by JS -->
+                </div>
+                <input type="hidden" name="skills" id="skills-hidden-input">
+                <p class="td-subtext" style="margin-top: 0.25rem;">Select help users find you better.</p>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Short Description/Bio (Max 100 chars)</label>
+                <input type="text" name="bio" required class="form-input"
+                    placeholder="e.g. Professional plumber with 5 years experience." maxlength="100" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Profile Photo</label>
+                <input type="file" name="photo" accept="image/*" capture="environment" class="form-input"
+                    onchange="previewImage(event)" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Portfolio Images (Add up to 10 images of your work)</label>
+                <div id="portfolio-images-container" class="portfolio-upload-grid">
+                    <div class="portfolio-upload-item" id="add-portfolio-btn"
+                        onclick="document.getElementById('portfolio-hidden-input').click()">
+                        <div class="upload-icon">+</div>
+                        <span>Add Project</span>
+                    </div>
+                </div>
+                <input type="file" id="portfolio-hidden-input" accept="image/*" multiple style="display: none;"
+                    onchange="handlePortfolioUpload(this)" />
+                <div id="selected-files-container"></div>
+                <p class="td-subtext" style="margin-top: 0.5rem;">Showcase your previous work to attract more customers.
+                </p>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Upload CV/Resume (PDF/CSV)</label>
+                <input type="file" name="cv" accept=".csv,application/pdf" class="form-input" />
+            </div>
+
+            <button type="submit" class="btn-submit">
+                Submit Application
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script>
+    function calculateAge() {
+        const dob = document.getElementById('dob-input').value;
+        if (!dob) return;
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        document.getElementById('age-input').value = age;
+    }
+
+
+
+
+
+    const professionInput = document.getElementById('profession-input');
+    const rateInput = document.getElementById('rate-input');
+    const skillsContainer = document.getElementById('skills-container');
+    const skillsHiddenInput = document.getElementById('skills-hidden-input');
+
+    const skillOptions = {
+        'Plumber': ['Pipe Fitting', 'Leak Repair', 'Drain Cleaning', 'Grouting', 'Fixture Installation'],
+        'Electrician': ['Wiring', 'Circuit Breakers', 'Lighting Install', 'Electrical Repair', 'Troubleshooting'],
+        'Carpenter': ['Furniture Repair', 'Cabinet Making', 'Framing', 'Wood Carving', 'Decking'],
+        'Cleaner': ['Deep Cleaning', 'Window Washing', 'Sanitizing', 'Carpet Cleaning', 'Decluttering'],
+        'Painter': ['Interior Painting', 'Exterior Painting', 'Wall Texturing', 'Staining', 'Wallpapering'],
+        'Gardener': ['Lawn Mowing', 'Pruning', 'Planting', 'Irrigation', 'Soil Mulching'],
+        'Mechanic': ['Engine Repair', 'Brake Service', 'Oil Change', 'Tire Rotation', 'Diagnostics'],
+        'Software Developer': ['Web Development', 'Mobile Apps', 'Backend', 'Database Design', 'Cloud Setup'],
+        'Teacher': ['Mathematics', 'Science', 'English', 'Test Prep', 'Special Education'],
+        'Doctor': ['General Practice', 'Pediatrics', 'First Aid', 'Patient Consultation', 'Emergency Care'],
+        'Engineer': ['CAD Design', 'Project Management', 'Site Survey', 'Structural Analysis', 'Problem Solving'],
+        'Designer': ['Graphic Design', 'UI/UX Design', 'Logo Design', 'Video Editing', '3D Modeling'],
+        'Bystander': ['Supervision', 'Documentation', 'Monitoring', 'Reporting', 'Crowd Control']
+    };
+
+    let selectedSkills = new Set();
+
+    function updateSkillsUI() {
+        if (!skillsContainer) return;
+        const profession = professionInput.value.trim();
+        skillsContainer.innerHTML = '';
+
+        let matchedProf = null;
+        for (let p in skillOptions) {
+            if (p.toLowerCase() === profession.toLowerCase()) {
+                matchedProf = p;
+                break;
+            }
+        }
+
+        const options = matchedProf ? skillOptions[matchedProf] : [];
+
+        if (options.length === 0) {
+            skillsContainer.innerHTML = '<p class="td-subtext" style="color:#94a3b8">Enter a profession to see skill tags...</p>';
+            return;
+        }
+
+        options.forEach(skill => {
+            const tag = document.createElement('div');
+            tag.className = 'skill-tag' + (selectedSkills.has(skill) ? ' selected' : '');
+            tag.textContent = skill;
+            tag.onclick = () => toggleSkill(skill, tag);
+            skillsContainer.appendChild(tag);
+        });
+    }
+
+    function toggleSkill(skill, element) {
+        if (selectedSkills.has(skill)) {
+            selectedSkills.delete(skill);
+            element.classList.remove('selected');
+        } else {
+            selectedSkills.add(skill);
+            element.classList.add('selected');
+        }
+        skillsHiddenInput.value = Array.from(selectedSkills).join(',');
+    }
+
+    if (professionInput) {
+        professionInput.addEventListener('input', function () {
+            const val = this.value.trim();
+            updateSkillsUI();
+        });
+    }
+
+    // Initial call
+    updateSkillsUI();
+
+    // Portfolio Upload Logic
+    let portfolio_files = [];
+    const portfolio_container = document.getElementById('portfolio-images-container');
+    const selected_files_container = document.getElementById('selected-files-container');
+    const MAX_IMAGES = 10;
+
+    window.handlePortfolioUpload = function (input) {
+        const files = Array.from(input.files);
+        if (portfolio_files.length + files.length > MAX_IMAGES) {
+            alert(`You can only upload up to ${MAX_IMAGES} images.`);
+            input.value = '';
+            return;
+        }
+
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const id = Date.now() + Math.random();
+                portfolio_files.push({ id, file });
+
+                const item = document.createElement('div');
+                item.className = 'portfolio-upload-item has-image';
+                item.innerHTML = `
+                    <img src="${e.target.result}" alt="Preview">
+                    <button type="button" class="remove-btn" onclick="removePortfolioImage(${id}, this)">×</button>
+                `;
+                portfolio_container.insertBefore(item, document.getElementById('add-portfolio-btn'));
+
+                const file_input = document.createElement('input');
+                file_input.type = 'file';
+                file_input.name = 'portfolio';
+                file_input.style.display = 'none';
+
+                try {
+                    const data_transfer = new DataTransfer();
+                    data_transfer.items.add(file);
+                    file_input.files = data_transfer.files;
+                    file_input.id = `input-${id}`;
+                    selected_files_container.appendChild(file_input);
+                } catch (err) {
+                    console.error("DataTransfer not supported", err);
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+        input.value = '';
+    }
+
+    window.removePortfolioImage = function (id, btn_element) {
+        portfolio_files = portfolio_files.filter(p => p.id !== id);
+        btn_element.parentElement.remove();
+        const input_to_remove = document.getElementById(`input-${id}`);
+        if (input_to_remove) input_to_remove.remove();
+    }
+</script>
+{% endblock %}

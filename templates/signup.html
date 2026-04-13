@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/signup.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="signup-container">
+    <div class="signup-card">
+        <h1 class="signup-title">Create Your Account</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash-alert {{ 'flash-error' if category == 'error' else 'flash-success' }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" class="signup-form">
+            <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="name" required class="form-input" placeholder="your name" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" name="email" required class="form-input" placeholder="you@example.com" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="tel" name="phone" required class="form-input" placeholder="Your phone number" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" required class="form-input" placeholder="••••••••" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" name="confirm_password" required class="form-input" placeholder="••••••••" />
+            </div>
+
+            <button type="submit" class="btn-signup-submit">
+                Create Account
+            </button>
+        </form>
+
+        <p class="signup-footer">
+            Already have an account?
+            <a href="/login" class="login-link">Log in</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

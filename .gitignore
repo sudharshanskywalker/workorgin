@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.venv
+env/
+venv/
+instance/
+.pytest_cache/
+.DS_Store
+# database.db  # Uncomment if you want to keep the database local-only
+static/uploads/*
+!static/uploads/.gitkeep

@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="flex-grow flex-col"> <!-- Removed min-h-screen as it's in body, kept flex-col if needed -->
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container hero-content">
+            <h1 class="hero-title">
+                Find Skilled Workers <br class="hero-title-break" />
+                <span class="hero-title-gradient">Instantly & Securely</span>
+            </h1>
+            <p class="hero-description">
+                Connect with verified local professionals for plumbing, electrical, cleaning, and more.
+                Book your service today with confidence.
+            </p>
+            <div class="hero-actions">
+                <a href="/services" class="btn-primary">
+                    Find a Worker <i data-lucide="arrow-right" style="width: 1rem; height: 1rem;"></i>
+                </a>
+                <a href="/join" class="btn-secondary">
+                    Become a Worker
+                </a>
+            </div>
+        </div>
+
+        <!-- Background Decorative Elements -->
+        <div class="hero-bg"></div>
+    </section>
+
+    <!-- Services Section -->
+    <section class="services-section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Our Services</h2>
+                <p class="section-subtitle">Browse our most popular service categories</p>
+            </div>
+            <div class="services-grid">
+                {% for service in services %}
+                <div class="service-card">
+                    <div class="service-icon-wrapper">
+                        <!-- Dynamic icon based on name -->
+                        <i data-lucide="{{ service.icon_name|lower }}" style="width: 1.5rem; height: 1.5rem;"></i>
+                    </div>
+                    <h3 class="service-title">{{ service.title }}</h3>
+                    <p class="service-desc">{{ service.description }}</p>
+                    <a href="/services?category={{ service.category }}" class="service-link group">
+                        Explore <i data-lucide="arrow-right" class="service-link-arrow"></i>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+  
+
+   
+{% endblock %}
