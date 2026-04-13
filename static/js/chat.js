@@ -6,8 +6,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.getElementById('chat-input');
     const chatMessages = document.getElementById('chat-messages');
 
+    // Restore chat history and open state using localStorage for better persistence
+    const savedHistory = localStorage.getItem('chatHistory');
+    if (savedHistory) {
+        chatMessages.innerHTML = savedHistory;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    const isChatOpen = localStorage.getItem('chatOpen');
+    if (isChatOpen === 'true') {
+        chatWindow.classList.add('active');
+    }
+
     chatBubble.addEventListener('click', () => {
         chatWindow.classList.toggle('active');
+        localStorage.setItem('chatOpen', chatWindow.classList.contains('active'));
         if (chatWindow.classList.contains('active')) {
             chatInput.focus();
         }
@@ -15,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     closeChat.addEventListener('click', () => {
         chatWindow.classList.remove('active');
+        localStorage.setItem('chatOpen', 'false');
     });
 
     chatForm.addEventListener('submit', async (e) => {
@@ -42,12 +56,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             // Remove typing indicator
-            chatMessages.removeChild(typing);
+            if (typing.parentNode) {
+                chatMessages.removeChild(typing);
+            }
 
             // Add bot response
             addMessage(data.response, 'bot', data.action);
         } catch (error) {
-            chatMessages.removeChild(typing);
+            if (typing.parentNode) {
+                chatMessages.removeChild(typing);
+            }
             addMessage("Lo siento, something went wrong. Please try again.", 'bot');
         }
     });
@@ -58,11 +76,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let content = text;
         if (action && action.type === 'link') {
-            content += `<br><a href="${action.url}" class="btn-primary" style="margin-top: 0.5rem; display: inline-block; padding: 0.25rem 0.75rem; font-size: 0.75rem;">${action.label}</a>`;
+            const label = action.label || "View Results";
+            content += `<br><a href="${action.url}" class="btn-primary" style="margin-top: 0.5rem; display: inline-block; padding: 0.25rem 0.75rem; font-size: 0.75rem; text-decoration: none; border-radius: 4px;">${label}</a>`;
         }
 
         msgDiv.innerHTML = content;
         chatMessages.appendChild(msgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Save history after each message
+        localStorage.setItem('chatHistory', chatMessages.innerHTML);
     }
 });
