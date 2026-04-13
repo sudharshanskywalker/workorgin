@@ -6,6 +6,7 @@ import os
 from werkzeug.utils import secure_filename
 from werkzeug.middleware.proxy_fix import ProxyFix
 from bot import get_bot_response   # chatbot import
+import threading
 
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'csv'}
@@ -21,7 +22,8 @@ app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_demo_purposes'
 
 # Fix for redirection issues behind proxies like PythonAnywhere/Vercel
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+# Using x_for=1 and x_proto=1 is generally enough and more compatible
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(basedir, 'database.db')
@@ -30,6 +32,123 @@ def get_db_connection():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
+
+_schema_lock = threading.Lock()
+_schema_ensured = False
+
+def ensure_db_schema():
+    """
+    Idempotent schema guard for hosting environments.
+    Keeps the app from 500-ing if a deployed SQLite file is missing new tables/columns.
+    """
+    global _schema_ensured
+    if _schema_ensured:
+        return
+
+    with _schema_lock:
+        if _schema_ensured:
+            return
+
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+
+            # Tables used by routes/templates (profile/admin/etc.)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    message TEXT NOT NULL,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    is_read INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS bookings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    worker_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    status TEXT DEFAULT 'Pending',
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (worker_id) REFERENCES workers (id),
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS reviews (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    worker_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    rating INTEGER NOT NULL,
+                    comment TEXT,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (worker_id) REFERENCES workers (id),
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS portfolio_images (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    worker_id INTEGER,
+                    request_id INTEGER,
+                    image_path TEXT NOT NULL,
+                    FOREIGN KEY (worker_id) REFERENCES workers (id),
+                    FOREIGN KEY (request_id) REFERENCES worker_requests (id)
+                )
+            """)
+
+            # Columns that older DBs may not have
+            def _ensure_column(table: str, column: str, ddl: str):
+                cur.execute(f"PRAGMA table_info({table})")
+                cols = [c[1] for c in cur.fetchall()]
+                if column not in cols:
+                    cur.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+            _ensure_column("users", "phone", "phone TEXT")
+
+            _ensure_column("workers", "user_id", "user_id INTEGER REFERENCES users(id)")
+            _ensure_column("workers", "work_hours", "work_hours TEXT")
+            _ensure_column("workers", "status", "status TEXT DEFAULT 'approved'")
+            _ensure_column("workers", "email", "email TEXT")
+            _ensure_column("workers", "skills", "skills TEXT")
+            _ensure_column("workers", "hourly_rate", "hourly_rate INTEGER DEFAULT 0")
+            _ensure_column("workers", "dob", "dob TEXT")
+            _ensure_column("workers", "age", "age INTEGER")
+            _ensure_column("workers", "phone", "phone TEXT")
+            _ensure_column("workers", "aadhaar", "aadhaar TEXT")
+
+            _ensure_column("worker_requests", "bio", "bio TEXT")
+            _ensure_column("worker_requests", "dob", "dob TEXT")
+            _ensure_column("worker_requests", "age", "age INTEGER")
+            _ensure_column("worker_requests", "phone", "phone TEXT")
+            _ensure_column("worker_requests", "skills", "skills TEXT")
+            _ensure_column("worker_requests", "user_id", "user_id INTEGER REFERENCES users(id)")
+            _ensure_column("worker_requests", "status", "status TEXT DEFAULT 'pending'")
+            _ensure_column("worker_requests", "cv", "cv TEXT")
+
+            _ensure_column("portfolio_images", "request_id", "request_id INTEGER REFERENCES worker_requests(id)")
+            _ensure_column("bookings", "timestamp", "timestamp TEXT DEFAULT CURRENT_TIMESTAMP")
+            _ensure_column("bookings", "status", "status TEXT DEFAULT 'Pending'")
+            _ensure_column("reviews", "timestamp", "timestamp TEXT DEFAULT CURRENT_TIMESTAMP")
+
+            conn.commit()
+            _schema_ensured = True
+        finally:
+            conn.close()
+
+@app.before_request
+def _ensure_schema_before_requests():
+    # Keep it silent; on hosting we just want to avoid 500s.
+    try:
+        ensure_db_schema()
+    except Exception:
+        # If schema repair fails, routes may still work depending on usage.
+        # Avoid crashing every request; real errors will surface in route handlers.
+        pass
 
 
 def login_required(f):
@@ -101,7 +220,7 @@ def admin_dashboard():
     # Stats
     pending_apps = len(requests)
     active_pros = len(active_workers)
-    total_bookings = conn.execute('SELECT COUNT(*) FROM booking_requests').fetchone()[0]
+    total_bookings = conn.execute('SELECT COUNT(*) FROM bookings').fetchone()[0]
 
     conn.close()
     return render_template(
@@ -314,51 +433,56 @@ def worker_profile(worker_id):
 @app.route('/profile')
 @login_required
 def profile():
-    user = session['user']
-    conn = get_db_connection()
+    try:
+        user = session['user']
+        conn = get_db_connection()
 
-    # Check if user is also a worker
-    worker_row = conn.execute(
-        'SELECT *, avatar as profile_image FROM workers WHERE user_id=?',
-        (user['id'],)
-    ).fetchone()
+        # Check if user is also a worker
+        worker_row = conn.execute(
+            'SELECT *, avatar as profile_image FROM workers WHERE user_id=?',
+            (user['id'],)
+        ).fetchone()
 
-    worker = None
-    bookings = []
+        worker = None
+        bookings = []
 
-    if worker_row:
-        worker = dict(worker_row)
-        # Get skills
-        skills_rows = conn.execute(
-            'SELECT skill FROM worker_skills WHERE worker_id=?',
-            (worker['id'],)
+        if worker_row:
+            worker = dict(worker_row)
+            # Get skills
+            skills_rows = conn.execute(
+                'SELECT skill FROM worker_skills WHERE worker_id=?',
+                (worker['id'],)
+            ).fetchall()
+            worker['skills'] = [s['skill'] for s in skills_rows]
+
+            # Get bookings for this worker
+            bookings_rows = conn.execute(
+                '''
+                SELECT br.*, u.name as user_name, u.email as user_email, u.phone as user_phone
+                FROM bookings br
+                JOIN users u ON br.user_id = u.id
+                WHERE br.worker_id = ?
+                ORDER BY br.timestamp DESC
+                ''', (worker['id'],)
+            ).fetchall()
+            bookings = [dict(b) for b in bookings_rows]
+
+        conn.close()
+
+        # Fetch notifications
+        conn = get_db_connection()
+        notifications_rows = conn.execute(
+            'SELECT * FROM notifications WHERE user_id=? ORDER BY timestamp DESC LIMIT 10',
+            (user['id'],)
         ).fetchall()
-        worker['skills'] = [s['skill'] for s in skills_rows]
+        notifications = [dict(n) for n in notifications_rows]
+        conn.close()
 
-        # Get bookings for this worker
-        bookings_rows = conn.execute(
-            '''
-            SELECT br.*, u.name as user_name, u.email as user_email, u.phone as user_phone
-            FROM booking_requests br
-            JOIN users u ON br.user_id = u.id
-            WHERE br.worker_id = ?
-            ORDER BY br.timestamp DESC
-            ''', (worker['id'],)
-        ).fetchall()
-        bookings = [dict(b) for b in bookings_rows]
-
-    conn.close()
-
-    # Fetch notifications
-    conn = get_db_connection()
-    notifications_rows = conn.execute(
-        'SELECT * FROM notifications WHERE user_id=? ORDER BY timestamp DESC LIMIT 10',
-        (user['id'],)
-    ).fetchall()
-    notifications = [dict(n) for n in notifications_rows]
-    conn.close()
-
-    return render_template('profile.html', user=user, worker=worker, bookings=bookings, notifications=notifications)
+        return render_template('profile.html', user=user, worker=worker, bookings=bookings, notifications=notifications)
+    except Exception as e:
+        # In a real environment, you'd log this properly. 
+        # For debugging, we'll return the error message if it fails.
+        return f"Database/Application Error on Profile Page: {str(e)}", 500
 
 
 # ---------------- SIGNUP ----------------
@@ -478,7 +602,7 @@ def book_pro():
     conn = get_db_connection()
     try:
         conn.execute(
-            'INSERT INTO booking_requests (worker_id, user_id, status) VALUES (?, ?, ?)',
+            'INSERT INTO bookings (worker_id, user_id, status) VALUES (?, ?, ?)',
             (worker_id, user_id, 'Pending')
         )
         
@@ -502,7 +626,7 @@ def book_pro():
 @login_required
 def accept_booking(booking_id):
     conn = get_db_connection()
-    conn.execute('UPDATE booking_requests SET status = ? WHERE id = ?', ('Accepted', booking_id))
+    conn.execute('UPDATE bookings SET status = ? WHERE id = ?', ('Accepted', booking_id))
     conn.commit()
     conn.close()
     flash('Booking accepted!', 'success')
@@ -512,7 +636,7 @@ def accept_booking(booking_id):
 @login_required
 def reject_booking(booking_id):
     conn = get_db_connection()
-    conn.execute('UPDATE booking_requests SET status = ? WHERE id = ?', ('Rejected', booking_id))
+    conn.execute('UPDATE bookings SET status = ? WHERE id = ?', ('Rejected', booking_id))
     conn.commit()
     conn.close()
     flash('Booking rejected.', 'info')

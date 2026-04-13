@@ -35,7 +35,6 @@
             </div>
 
             <div class="nav-actions">
-                {% if request.path == '/' %}
                 {% if session.get('user') %}
                 <a href="/profile"
                     style="display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit;">
@@ -46,7 +45,6 @@
                 {% else %}
                 <a href="/login" class="btn-signin">Sign In</a>
                 <a href="/signup" class="btn-signup">Sign Up</a>
-                {% endif %}
                 {% endif %}
             </div>
 
@@ -63,7 +61,6 @@
                 <a href="/services" class="mobile-nav-link">Find Workers</a>
                 <a href="/join" class="mobile-nav-link">Join as Pro</a>
                 <div class="mobile-auth-actions">
-                    {% if request.path == '/' %}
                     {% if session.get('user') %}
                     <a href="/profile" class="mobile-nav-link"
                         style="padding-left: 0; color: var(--blue-600); font-weight: 600;">
@@ -73,7 +70,6 @@
                     {% else %}
                     <a href="/login" class="mobile-btn-signin">Sign In</a>
                     <a href="/signup" class="mobile-btn-signup">Sign Up</a>
-                    {% endif %}
                     {% endif %}
                 </div>
             </div>
